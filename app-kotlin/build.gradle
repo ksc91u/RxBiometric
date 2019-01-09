@@ -38,6 +38,7 @@ dependencies {
   implementation deps.appcompat
   implementation deps.constraintlayout
   implementation deps.material
+  implementation deps.biometrics
 }
 
 buildscript {

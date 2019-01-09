@@ -22,6 +22,8 @@ import androidx.biometric.BiometricPrompt.CryptoObject
 import androidx.fragment.app.FragmentActivity
 import io.reactivex.Completable
 import io.reactivex.CompletableEmitter
+import io.reactivex.Single
+import io.reactivex.SingleEmitter
 import java.util.concurrent.Executor
 
 class RxBiometric {
@@ -79,8 +81,8 @@ class RxBiometric {
     }
 
     @JvmStatic
-    fun authenticate(activity: FragmentActivity): Completable {
-      return Completable.create { emitter ->
+    fun authenticate(activity: FragmentActivity): Single<BiometricPrompt.AuthenticationResult> {
+      return Single.create { emitter ->
         createPrompt(activity, emitter).authenticate(promptInfo)
       }
     }
@@ -89,8 +91,8 @@ class RxBiometric {
     fun authenticate(
       activity: FragmentActivity,
       cryptoObject: CryptoObject
-    ): Completable {
-      return Completable.create { emitter ->
+    ): Single<BiometricPrompt.AuthenticationResult> {
+      return Single.create { emitter ->
         createPrompt(activity, emitter).authenticate(
           promptInfo,
           cryptoObject
@@ -98,11 +100,11 @@ class RxBiometric {
       }
     }
 
-    fun createPrompt(activity: FragmentActivity, emitter: CompletableEmitter): BiometricPrompt {
+    fun createPrompt(activity: FragmentActivity, emitter: SingleEmitter<BiometricPrompt.AuthenticationResult>): BiometricPrompt {
       return BiometricPrompt(activity, executor, createAuthenticationCallback(emitter))
     }
 
-    fun createAuthenticationCallback(emitter: CompletableEmitter): AuthenticationCallback {
+    fun createAuthenticationCallback(emitter: SingleEmitter<BiometricPrompt.AuthenticationResult>): AuthenticationCallback {
       return Authentication().createAuthenticationCallback(emitter)
     }
   }

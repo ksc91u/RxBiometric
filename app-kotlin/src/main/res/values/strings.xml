@@ -2,4 +2,6 @@
   <string name="app_name">RxBiometric</string>
   <string name="title_activity_main">MainActivity</string>
   <string name="authenticate">authenticate</string>
+  <string name="encrypt">encrypt</string>
+  <string name="decrypt">decrypt</string>
 </resources>

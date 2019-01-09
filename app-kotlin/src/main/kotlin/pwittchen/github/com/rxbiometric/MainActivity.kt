@@ -18,6 +18,7 @@ package pwittchen.github.com.rxbiometric
 import android.content.DialogInterface
 import android.os.Build
 import android.os.Bundle
+import android.security.keystore.KeyProperties
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import android.widget.Toast
@@ -31,13 +32,29 @@ import io.reactivex.Completable
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.Disposable
 import io.reactivex.rxkotlin.subscribeBy
-import io.reactivex.schedulers.Schedulers
 import kotlinx.android.synthetic.main.activity_main.toolbar
-import kotlinx.android.synthetic.main.content_main.button
+import kotlinx.android.synthetic.main.content_main.*
+import java.io.IOException
+import java.security.*
+import javax.crypto.KeyGenerator
+import android.security.keystore.KeyGenParameterSpec
+import android.util.Base64
+import androidx.biometric.BiometricPrompt
+import androidx.core.hardware.fingerprint.FingerprintManagerCompat
+import io.reactivex.Single
+import java.security.spec.ECGenParameterSpec
+import javax.crypto.Cipher
+import javax.crypto.SecretKey
+import javax.crypto.spec.IvParameterSpec
+
 
 class MainActivity : AppCompatActivity() {
 
   private var disposable: Disposable? = null
+
+  private var encoded : String = ""
+
+  private var lastIv: String = ""
 
   @RequiresApi(Build.VERSION_CODES.P)
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,12 +64,38 @@ class MainActivity : AppCompatActivity() {
 
 
     button.setOnClickListener { _ ->
-      disposable =
         RxPreconditions
           .canHandleBiometric(this)
-          .flatMapCompletable {
-            if (!it) Completable.error(BiometricNotSupported())
-            else
+          .flatMap {
+            if (!it) Single.error(BiometricNotSupported())
+            else {
+              var keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+                .apply {
+                  val builder = KeyGenParameterSpec.Builder("KUNG KEY",
+                    KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+                  val keySpec = builder.setKeySize(256)
+                    .setBlockModes(KeyProperties.BLOCK_MODE_CBC)
+                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_PKCS7)
+                    .setRandomizedEncryptionRequired(true)
+                    .setUserAuthenticationRequired(true)
+                    .setUserAuthenticationValidityDurationSeconds(5 * 60)
+                    .build()
+                  init(keySpec)
+                }
+              val keypair = keyGenerator.generateKey()
+              val cipher = Cipher.getInstance(
+                KeyProperties.KEY_ALGORITHM_AES + "/"
+                  + KeyProperties.BLOCK_MODE_CBC + "/"
+                  + KeyProperties.ENCRYPTION_PADDING_PKCS7)
+                .apply {
+                  if(encoded.isEmpty()) {
+                    init(Cipher.ENCRYPT_MODE, keypair)
+                  }else{
+                    init(Cipher.DECRYPT_MODE, keypair, IvParameterSpec(Base64.decode(lastIv, Base64.URL_SAFE)))
+                  }
+                }
+              var cryptoObject = BiometricPrompt.CryptoObject(cipher)
+
               RxBiometric
                 .title("title")
                 .description("description")
@@ -62,23 +105,74 @@ class MainActivity : AppCompatActivity() {
                 })
                 .executor(ActivityCompat.getMainExecutor(this@MainActivity))
                 .build()
-                .authenticate(this)
-          }
-        .observeOn(AndroidSchedulers.mainThread())
-        .subscribeBy(
-          onComplete = { showMessage("authenticated!") },
-          onError = {
-            when (it) {
-              is AuthenticationError -> showMessage("error: ${it.errorCode} ${it.errorMessage}")
-              is AuthenticationFail -> showMessage("fail")
-              else -> {
-                showMessage("other error")
-              }
+                .authenticate(this, cryptoObject)
             }
           }
-        )
+          .observeOn(AndroidSchedulers.mainThread())
+          .subscribeBy(
+            onSuccess = {
+              showMessage("authenticated! ${it.cryptoObject}")
+              if(encoded.isNotEmpty()){
+                it.cryptoObject?.cipher?.let { cipher ->
+                  val cipherBytes = encoded.toByteArray()
+                  val out = cipher.doFinal(cipherBytes)
+                  val b64 = Base64.encodeToString(out, Base64.URL_SAFE)
+                  println(">>>>> decode $b64")
+                  encoded = ""
+                  lastIv = ""
+                }
+              }else {
+                it.cryptoObject?.cipher?.let { cipher ->
+                  val plaintext = "Hello World".toByteArray()
+                  val out = cipher.doFinal(plaintext)
+                  val b64 = Base64.encodeToString(out, Base64.URL_SAFE)
+                  encoded = b64
+                  lastIv = Base64.encodeToString(cipher.iv, Base64.URL_SAFE)
+                  println(">>>>> encode $b64")
+                }
+              }
+            },
+            onError = {
+              when (it) {
+                is AuthenticationError -> showMessage("error: ${it.errorCode} ${it.errorMessage}")
+                is AuthenticationFail -> showMessage("fail")
+                else -> {
+                  showMessage("other error")
+                }
+              }
+            }
+          )
+    }
+
+    encryptBtn.setOnClickListener {
+      var keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+        .apply {
+          val builder = KeyGenParameterSpec.Builder("KUNG KEY",
+            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+          val keySpec = builder.setKeySize(256)
+            .setBlockModes(KeyProperties.BLOCK_MODE_CBC)
+            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_PKCS7)
+            .setRandomizedEncryptionRequired(true)
+            .setUserAuthenticationRequired(true)
+            .setUserAuthenticationValidityDurationSeconds(5 * 60)
+            .build()
+          init(keySpec)
+        }
+      val keypair = keyGenerator.generateKey()
+      val cipher = Cipher.getInstance(
+        KeyProperties.KEY_ALGORITHM_AES + "/"
+          + KeyProperties.BLOCK_MODE_CBC + "/"
+          + KeyProperties.ENCRYPTION_PADDING_PKCS7)
+        .apply { init(Cipher.ENCRYPT_MODE, keypair) }
+      var cryptoObject = BiometricPrompt.CryptoObject(cipher)
+
+      val plaintext = "Hello World".toByteArray()
+      val out = cipher.doFinal(plaintext)
+      val b64 = Base64.encodeToString(out, Base64.URL_SAFE)
+      println(">>>>> $b64")
     }
   }
+
 
   override fun onPause() {
     super.onPause()
