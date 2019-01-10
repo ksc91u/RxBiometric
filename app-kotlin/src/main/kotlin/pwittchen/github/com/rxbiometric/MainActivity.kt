@@ -80,13 +80,17 @@ class MainActivity : AppCompatActivity() {
 
 
     button.setOnClickListener { _ ->
-      secureKey = SecureKey("", "SomeNewKey").apply {
+      secureKey = SecureKey("", "SomeNewKey", this@MainActivity).apply {
         initBiometrics(this@MainActivity)
+        val encBytes = encryptWithPasscode("Hello World AES".toByteArray())
+        val clearBytes = decryptWithPasscode(encBytes)
+        println(">>>>> " + String(clearBytes))
       }
+
     }
 
     encryptBtn.setOnClickListener {
-      secureKey?.encryptWithBiometrics(this, "Hello World".toByteArray()).subscribe{
+      secureKey?.encryptWithBiometrics(this, "Hello World".toByteArray())?.subscribe{
         if(it == null) {
           return@subscribe
         }
@@ -98,7 +102,7 @@ class MainActivity : AppCompatActivity() {
     decryptBtn.setOnClickListener {
       val iv = Base64.decode(this.lastIv, Base64.URL_SAFE)
       val encBytes = Base64.decode(this.encoded, Base64.URL_SAFE)
-      secureKey?.decryptWithBiometrics(this, Pair(encBytes, iv)).subscribe{
+      secureKey?.decryptWithBiometrics(this, Pair(encBytes, iv))?.subscribe{
         if(it ==  null){
           return@subscribe
         }
@@ -117,7 +121,7 @@ class MainActivity : AppCompatActivity() {
       println(">>>>> private key " + pair.privateKey)
 
       var cipher = Cipher.getInstance(KeyProperties.KEY_ALGORITHM_RSA + "/"
-        + KeyProperties.BLOCK_MODE_ECB + "/"
+        + KeyProperties.RSA_BLOCK_MODE_ECB + "/"
         + KeyProperties.ENCRYPTION_PADDING_RSA_PKCS1)
       var triple = getAESKeyEncrypted()
 
@@ -157,7 +161,7 @@ class MainActivity : AppCompatActivity() {
       sr.nextBytes(aes1)
 
       var cipher = Cipher.getInstance(KeyProperties.KEY_ALGORITHM_RSA + "/"
-        + KeyProperties.BLOCK_MODE_ECB + "/"
+        + KeyProperties.RSA_BLOCK_MODE_ECB + "/"
         + KeyProperties.ENCRYPTION_PADDING_RSA_PKCS1)
 
       cipher.init(Cipher.ENCRYPT_MODE, pair.public)
