@@ -16,8 +16,12 @@
 package pwittchen.github.com.rxbiometric
 
 import android.content.DialogInterface
+import android.content.SharedPreferences
 import android.os.Build
 import android.os.Bundle
+import android.preference.PreferenceDataStore
+import android.preference.PreferenceManager
+import android.security.KeyPairGeneratorSpec
 import android.security.keystore.KeyProperties
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
@@ -39,18 +43,28 @@ import android.security.keystore.KeyGenParameterSpec
 import android.util.Base64
 import androidx.biometric.BiometricPrompt
 import io.reactivex.Observable
+import java.math.BigInteger
+import java.util.*
 import javax.crypto.Cipher
 import javax.crypto.SecretKey
 import javax.crypto.spec.IvParameterSpec
+import javax.security.auth.x500.X500Principal
 
+/*
+*
+* M 以上 -> Biometrics 256bits AES Key
+*       -> Passcode + Keystore RSA( AES Key)
+* */
 
 class MainActivity : AppCompatActivity() {
 
   private var disposable: Disposable? = null
 
-  private var encoded : String = ""
+  private var encoded: String = ""
 
   private var lastIv: String = ""
+
+  private lateinit var sharedPreference: SharedPreferences
 
   @RequiresApi(Build.VERSION_CODES.P)
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,111 +72,169 @@ class MainActivity : AppCompatActivity() {
     setContentView(R.layout.activity_main)
     setSupportActionBar(toolbar)
 
+    sharedPreference = PreferenceManager.getDefaultSharedPreferences(this)
+
 
     button.setOnClickListener { _ ->
-        RxPreconditions
-          .canHandleBiometric(this)
-          .flatMapObservable {
-            if (!it) Observable.error(BiometricNotSupported())
-            else {
-              val keypair = getAESKey("KUNG KEY")
-              val cipher = Cipher.getInstance(
-                KeyProperties.KEY_ALGORITHM_AES + "/"
-                  + KeyProperties.BLOCK_MODE_CBC + "/"
-                  + KeyProperties.ENCRYPTION_PADDING_PKCS7)
-                .apply {
-                  if(encoded.isEmpty()) {
-                    init(Cipher.ENCRYPT_MODE, keypair)
-                  }else{
-                    init(Cipher.DECRYPT_MODE, keypair, IvParameterSpec(Base64.decode(lastIv, Base64.URL_SAFE)))
-                  }
+      RxPreconditions
+        .canHandleBiometric(this)
+        .flatMapObservable {
+          if (!it) Observable.error(BiometricNotSupported())
+          else {
+            val keypair = getAESKey("KUNG KEY")
+            val cipher = Cipher.getInstance(
+              KeyProperties.KEY_ALGORITHM_AES + "/"
+                + KeyProperties.BLOCK_MODE_CBC + "/"
+                + KeyProperties.ENCRYPTION_PADDING_PKCS7)
+              .apply {
+                if (encoded.isEmpty()) {
+                  init(Cipher.ENCRYPT_MODE, keypair)
+                } else {
+                  init(Cipher.DECRYPT_MODE, keypair, IvParameterSpec(Base64.decode(lastIv, Base64.URL_SAFE)))
                 }
-              var cryptoObject = BiometricPrompt.CryptoObject(cipher)
+              }
+            var cryptoObject = BiometricPrompt.CryptoObject(cipher)
 
-              RxBiometric
-                .title("title")
-                .description("description")
-                .negativeButtonText("cancel")
-                .negativeButtonListener(DialogInterface.OnClickListener { _, _ ->
-                  showMessage("cancel")
-                })
-                .executor(ActivityCompat.getMainExecutor(this@MainActivity))
-                .build()
-                .authenticate(this, cryptoObject)
+            RxBiometric
+              .title("title")
+              .description("description")
+              .negativeButtonText("cancel")
+              .negativeButtonListener(DialogInterface.OnClickListener { _, _ ->
+                showMessage("cancel")
+              })
+              .executor(ActivityCompat.getMainExecutor(this@MainActivity))
+              .build()
+              .authenticate(this, cryptoObject)
+          }
+        }
+        .observeOn(AndroidSchedulers.mainThread())
+        .subscribeBy(
+          onNext = {
+            showMessage("authenticated! ${it.cryptoObject}")
+            if (encoded.isNotEmpty()) {
+              it.cryptoObject?.cipher?.let { cipher ->
+                val cipherBytes = Base64.decode(encoded, Base64.URL_SAFE)
+                println(">>>> will decode ${cipherBytes.size}, $encoded ${encoded.length}")
+                val out = cipher.doFinal(cipherBytes)
+                val b64 = String(out)
+                println(">>>>> decode $b64")
+                encoded = ""
+                lastIv = ""
+              }
+            } else {
+              it.cryptoObject?.cipher?.let { cipher ->
+                val plaintext = "Hello World Hello World Hello World Hello World Hello World".toByteArray()
+                val out = cipher.doFinal(plaintext)
+                val b64 = Base64.encodeToString(out, Base64.URL_SAFE)
+                encoded = b64
+                lastIv = Base64.encodeToString(cipher.iv, Base64.URL_SAFE)
+                println(">>>>> encode ${out.size} bytes, $b64 ${b64.length}")
+              }
+            }
+          },
+          onError = {
+            when (it) {
+              is AuthenticationError -> showMessage("error: ${it.errorCode} ${it.errorMessage}")
+              is AuthenticationFail -> showMessage("fail")
+              else -> {
+                it.printStackTrace()
+                showMessage("other error")
+              }
             }
           }
-          .observeOn(AndroidSchedulers.mainThread())
-          .subscribeBy(
-            onNext = {
-              showMessage("authenticated! ${it.cryptoObject}")
-              if(encoded.isNotEmpty()){
-                it.cryptoObject?.cipher?.let { cipher ->
-                  val cipherBytes = Base64.decode(encoded, Base64.URL_SAFE)
-                  println(">>>> will decode ${cipherBytes.size}, $encoded ${encoded.length}")
-                  val out = cipher.doFinal(cipherBytes)
-                  val b64 = String(out)
-                  println(">>>>> decode $b64")
-                  encoded = ""
-                  lastIv = ""
-                }
-              }else {
-                it.cryptoObject?.cipher?.let { cipher ->
-                  val plaintext = "Hello World Hello World Hello World Hello World Hello World".toByteArray()
-                  val out = cipher.doFinal(plaintext)
-                  val b64 = Base64.encodeToString(out, Base64.URL_SAFE)
-                  encoded = b64
-                  lastIv = Base64.encodeToString(cipher.iv, Base64.URL_SAFE)
-                  println(">>>>> encode ${out.size} bytes, $b64 ${b64.length}")
-                }
-              }
-            },
-            onError = {
-              when (it) {
-                is AuthenticationError -> showMessage("error: ${it.errorCode} ${it.errorMessage}")
-                is AuthenticationFail -> showMessage("fail")
-                else -> {
-                  it.printStackTrace()
-                  showMessage("other error")
-                }
-              }
-            }
-          )
+        )
     }
 
     encryptBtn.setOnClickListener {
-      var keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
-        .apply {
-          val builder = KeyGenParameterSpec.Builder("KUNG KEY",
-            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
-          val keySpec = builder.setKeySize(256)
-            .setBlockModes(KeyProperties.BLOCK_MODE_CBC)
-            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_PKCS7)
-            .setRandomizedEncryptionRequired(true)
-            .setUserAuthenticationRequired(true)
-            .setUserAuthenticationValidityDurationSeconds(5 * 60)
-            .build()
-          init(keySpec)
-        }
-      val keypair = keyGenerator.generateKey()
-      val cipher = Cipher.getInstance(
-        KeyProperties.KEY_ALGORITHM_AES + "/"
-          + KeyProperties.BLOCK_MODE_CBC + "/"
-          + KeyProperties.ENCRYPTION_PADDING_PKCS7)
-        .apply { init(Cipher.ENCRYPT_MODE, keypair) }
-      var cryptoObject = BiometricPrompt.CryptoObject(cipher)
-
-      val plaintext = "Hello World".toByteArray()
-      val out = cipher.doFinal(plaintext)
-      val b64 = Base64.encodeToString(out, Base64.URL_SAFE)
-      println(">>>>> $b64")
+      val keypair = getAESKey("KUNG KEY RSA", "")
     }
   }
 
-  @RequiresApi(Build.VERSION_CODES.M)
-  fun getAESKey(keyAlias: String) :SecretKey {
+  fun setAESKeyEncrypted(aesbytes: ByteArray, aesbytes1: ByteArray, iv: ByteArray) {
+    sharedPreference.edit().putString("AES_KEY_ENCRYPTED_0", Base64.encodeToString(aesbytes, Base64.URL_SAFE)).apply()
+    sharedPreference.edit().putString("AES_KEY_ENCRYPTED_1", Base64.encodeToString(aesbytes1, Base64.URL_SAFE)).apply()
+    sharedPreference.edit().putString("IV", Base64.encodeToString(iv, Base64.URL_SAFE)).apply()
+  }
+
+  fun getAESKeyEncrypted(): Triple<ByteArray, ByteArray, ByteArray>? {
+    if (sharedPreference.contains("AES_KEY_ENCRYPTED_0")) {
+      val aes0 = Base64.decode(sharedPreference.getString("AES_KEY_ENCRYPTED_0", ""), Base64.URL_SAFE)
+      val aes1 = Base64.decode(sharedPreference.getString("AES_KEY_ENCRYPTED_1", ""), Base64.URL_SAFE)
+      val iv = Base64.decode(sharedPreference.getString("IV", ""), Base64.URL_SAFE)
+      return Triple(aes0, aes1, iv)
+    }
+    return null
+  }
+
+  fun getAESKey(keyAlias: String, password: String): SecretKey? {
     val androidKeyStore = KeyStore.getInstance("AndroidKeyStore")
     androidKeyStore.load(null)
-    if(androidKeyStore.containsAlias(keyAlias)){
+    if (androidKeyStore.containsAlias(keyAlias)) {
+      val pair = androidKeyStore.getEntry(keyAlias, null) as KeyStore.PrivateKeyEntry
+      println(">>>>> private key get ")
+      println(">>>>> private key " + pair.privateKey)
+
+      var cipher = Cipher.getInstance(KeyProperties.KEY_ALGORITHM_RSA + "/"
+        + KeyProperties.BLOCK_MODE_ECB + "/"
+        + KeyProperties.ENCRYPTION_PADDING_RSA_PKCS1)
+      var triple = getAESKeyEncrypted()
+
+      triple?.let {
+        cipher.init(Cipher.DECRYPT_MODE, pair.privateKey)
+        val aes1 = cipher.doFinal(it.first)
+        val aes2 = cipher.doFinal(it.second)
+        println(">>>> get aes key "+ Base64.encodeToString(aes1, Base64.URL_SAFE) + "/" + Base64.encodeToString(aes2, Base64.URL_SAFE))
+      }
+
+
+      return null
+    }
+
+    val kpg = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_RSA, "AndroidKeyStore")
+    val keySpec = KeyPairGeneratorSpec.Builder(this@MainActivity)
+      .setAlias(keyAlias)
+      .setKeyType(KeyProperties.KEY_ALGORITHM_RSA)
+      .setKeySize(2048)
+      .setSubject(X500Principal("CN=mobidick"))
+      .setSerialNumber(BigInteger.ONE)
+      .setStartDate(Date(1970, 1, 1, 1, 1, 1))
+      .setEndDate(Date(2100, 1, 1, 1, 1, 1))
+      .build()
+    kpg.initialize(keySpec)
+    val pair = kpg.genKeyPair()
+    println(">>>>> private key generated ")
+    println(">>>>> private key " + pair.private)
+
+
+    if (getAESKeyEncrypted() == null) {
+      var sr = SecureRandom()
+      var iv = sr.generateSeed(12)
+      var aes0 = ByteArray(16)
+      var aes1 = ByteArray(16)
+      sr.nextBytes(aes0)
+      sr.nextBytes(aes1)
+
+      var cipher = Cipher.getInstance(KeyProperties.KEY_ALGORITHM_RSA + "/"
+        + KeyProperties.BLOCK_MODE_ECB + "/"
+        + KeyProperties.ENCRYPTION_PADDING_RSA_PKCS1)
+
+      cipher.init(Cipher.ENCRYPT_MODE, pair.public)
+
+      setAESKeyEncrypted(cipher.doFinal(aes0), cipher.doFinal(aes1), iv)
+
+      println(">>>> generate aes key " + Base64.encodeToString(aes0, Base64.URL_SAFE) + "/" + Base64.encodeToString(aes1, Base64.URL_SAFE))
+    }
+
+
+
+    return null
+  }
+
+  @RequiresApi(Build.VERSION_CODES.M)
+  fun getAESKey(keyAlias: String): SecretKey {
+    val androidKeyStore = KeyStore.getInstance("AndroidKeyStore")
+    androidKeyStore.load(null)
+    if (androidKeyStore.containsAlias(keyAlias)) {
       return androidKeyStore.getKey(keyAlias, null) as SecretKey
     }
 
