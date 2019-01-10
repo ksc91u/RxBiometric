@@ -19,16 +19,18 @@ import androidx.biometric.BiometricPrompt.AuthenticationCallback
 import androidx.biometric.BiometricPrompt.AuthenticationResult
 import com.github.pwittchen.rxbiometric.library.throwable.AuthenticationError
 import com.github.pwittchen.rxbiometric.library.throwable.AuthenticationFail
-import io.reactivex.SingleEmitter
+import io.reactivex.ObservableEmitter
 
 open class Authentication {
-  fun createAuthenticationCallback(it: SingleEmitter<AuthenticationResult>): AuthenticationCallback {
+  fun createAuthenticationCallback(it: ObservableEmitter<AuthenticationResult>): AuthenticationCallback {
     return object : AuthenticationCallback() {
       override fun onAuthenticationSucceeded(result: AuthenticationResult) {
-        it.onSuccess(result)
+        println(">>>> ${it.hashCode()} isDisposed: ${it.isDisposed} onsuccess")
+        it.onNext(result)
       }
 
       override fun onAuthenticationFailed() {
+        println(">>>> ${it.hashCode()} onerror")
         it.tryOnError(AuthenticationFail())
       }
 
@@ -36,6 +38,7 @@ open class Authentication {
         errorCode: Int,
         errorMessage: CharSequence
       ) {
+        println(">>>> ${it.hashCode()} onerror")
         it.tryOnError(AuthenticationError(errorCode, errorMessage))
       }
     }

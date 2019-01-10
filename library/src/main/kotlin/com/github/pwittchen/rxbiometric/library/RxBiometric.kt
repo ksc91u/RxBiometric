@@ -20,10 +20,7 @@ import androidx.biometric.BiometricPrompt
 import androidx.biometric.BiometricPrompt.AuthenticationCallback
 import androidx.biometric.BiometricPrompt.CryptoObject
 import androidx.fragment.app.FragmentActivity
-import io.reactivex.Completable
-import io.reactivex.CompletableEmitter
-import io.reactivex.Single
-import io.reactivex.SingleEmitter
+import io.reactivex.*
 import java.util.concurrent.Executor
 
 class RxBiometric {
@@ -81,8 +78,8 @@ class RxBiometric {
     }
 
     @JvmStatic
-    fun authenticate(activity: FragmentActivity): Single<BiometricPrompt.AuthenticationResult> {
-      return Single.create { emitter ->
+    fun authenticate(activity: FragmentActivity): Observable<BiometricPrompt.AuthenticationResult> {
+      return Observable.create { emitter ->
         createPrompt(activity, emitter).authenticate(promptInfo)
       }
     }
@@ -91,8 +88,9 @@ class RxBiometric {
     fun authenticate(
       activity: FragmentActivity,
       cryptoObject: CryptoObject
-    ): Single<BiometricPrompt.AuthenticationResult> {
-      return Single.create { emitter ->
+    ): Observable<BiometricPrompt.AuthenticationResult> {
+      return Observable.create { emitter ->
+        println(">>> emitter ${emitter.hashCode()}")
         createPrompt(activity, emitter).authenticate(
           promptInfo,
           cryptoObject
@@ -100,11 +98,11 @@ class RxBiometric {
       }
     }
 
-    fun createPrompt(activity: FragmentActivity, emitter: SingleEmitter<BiometricPrompt.AuthenticationResult>): BiometricPrompt {
+    fun createPrompt(activity: FragmentActivity, emitter: ObservableEmitter<BiometricPrompt.AuthenticationResult>): BiometricPrompt {
       return BiometricPrompt(activity, executor, createAuthenticationCallback(emitter))
     }
 
-    fun createAuthenticationCallback(emitter: SingleEmitter<BiometricPrompt.AuthenticationResult>): AuthenticationCallback {
+    fun createAuthenticationCallback(emitter: ObservableEmitter<BiometricPrompt.AuthenticationResult>): AuthenticationCallback {
       return Authentication().createAuthenticationCallback(emitter)
     }
   }
