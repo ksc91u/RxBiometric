@@ -23,6 +23,7 @@ import io.reactivex.rxkotlin.subscribeBy
 import java.math.BigInteger
 import java.security.*
 import java.util.*
+import javax.crypto.BadPaddingException
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -30,7 +31,7 @@ import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
 import javax.security.auth.x500.X500Principal
 
-class SecureKey(private val passcode: String, private val keyName: String, private val context: Context) {
+class SecureKey(private val keyName: String, private val context: Context) {
 
   companion object {
     val KEY_ALGORITHM_RSA = "RSA"
@@ -99,10 +100,10 @@ class SecureKey(private val passcode: String, private val keyName: String, priva
       return
     }
 
-    val kpg = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_RSA, "AndroidKeyStore")
+    val kpg = KeyPairGenerator.getInstance(KEY_ALGORITHM_RSA, "AndroidKeyStore")
     val keySpec = KeyPairGeneratorSpec.Builder(context)
       .setAlias(rsaKeyName)
-      .setKeyType(KeyProperties.KEY_ALGORITHM_RSA)
+      .setKeyType(KEY_ALGORITHM_RSA)
       .setKeySize(3072)
       .setSubject(X500Principal("CN=mobidick"))
       .setSerialNumber(BigInteger.ONE)
@@ -143,30 +144,40 @@ class SecureKey(private val passcode: String, private val keyName: String, priva
         if (authResult.cryptoObject == null) {
           return@map null
         } else {
-          val cipher = authResult.cryptoObject!!.cipher!!
-          val result = cipher.doFinal(encryptTextAndIv.first)
+          val cipherFromResult = authResult.cryptoObject!!.cipher!!
+          val result = cipherFromResult.doFinal(encryptTextAndIv.first)
           return@map result
         }
       }
   }
 
-  /* insecure aes encoding, should use SecretKeyFactory */
-  fun encryptWithPasscode(clearTextBytes: ByteArray): ByteArray {
+  fun sha256WithPasscode(passcode: String): ByteArray {
+    var bytes = passcode.toByteArray() + aes_part0 + aes_part1
+    var sha256md = MessageDigest.getInstance("SHA-256")
+    sha256md.update(bytes)
+    return sha256md.digest()
+  }
+
+  fun encryptWithPasscode(passcode: String, clearTextBytes: ByteArray): ByteArray {
     var iv = ByteArray(16)
     secureRandom.nextBytes(iv)
 
-    val skeySpec = SecretKeySpec(aes_part0.sliceArray(IntRange(0, 15)), AES)
+    val skeySpec = SecretKeySpec(sha256WithPasscode(passcode), AES)
     val cipher = Cipher.getInstance(AES_CBC_PKCS5)
     cipher.init(Cipher.ENCRYPT_MODE, skeySpec, IvParameterSpec(iv))
+
     return iv + cipher.doFinal(clearTextBytes)
   }
 
-  fun decryptWithPasscode(encTextBytes: ByteArray): ByteArray {
-    val skeySpec = SecretKeySpec(aes_part0.sliceArray(IntRange(0, 15)), AES)
-    val cipher = Cipher.getInstance(AES_CBC_PKCS5)
+  @Throws(BadPaddingException::class)
+  fun decryptWithPasscode(passcode: String, encTextBytes: ByteArray): ByteArray {
     val iv = encTextBytes.sliceArray(IntRange(0, 15))
     val enc = encTextBytes.sliceArray(IntRange(16, encTextBytes.size - 1))
+
+    val skeySpec = SecretKeySpec(sha256WithPasscode(passcode), AES)
+    val cipher = Cipher.getInstance(AES_CBC_PKCS5)
     cipher.init(Cipher.DECRYPT_MODE, skeySpec, IvParameterSpec(iv))
+
     return cipher.doFinal(enc)
   }
 
