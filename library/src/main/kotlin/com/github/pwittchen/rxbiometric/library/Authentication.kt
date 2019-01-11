@@ -25,12 +25,10 @@ open class Authentication {
   fun createAuthenticationCallback(it: ObservableEmitter<AuthenticationResult>): AuthenticationCallback {
     return object : AuthenticationCallback() {
       override fun onAuthenticationSucceeded(result: AuthenticationResult) {
-        println(">>>> ${it.hashCode()} isDisposed: ${it.isDisposed} onsuccess")
         it.onNext(result)
       }
 
       override fun onAuthenticationFailed() {
-        println(">>>> ${it.hashCode()} onerror")
         it.tryOnError(AuthenticationFail())
       }
 
@@ -38,7 +36,6 @@ open class Authentication {
         errorCode: Int,
         errorMessage: CharSequence
       ) {
-        println(">>>> ${it.hashCode()} onerror")
         it.tryOnError(AuthenticationError(errorCode, errorMessage))
       }
     }

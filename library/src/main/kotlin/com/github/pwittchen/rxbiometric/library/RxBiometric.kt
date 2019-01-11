@@ -90,7 +90,6 @@ class RxBiometric {
       cryptoObject: CryptoObject
     ): Observable<BiometricPrompt.AuthenticationResult> {
       return Observable.create { emitter ->
-        println(">>> emitter ${emitter.hashCode()}")
         createPrompt(activity, emitter).authenticate(
           promptInfo,
           cryptoObject
