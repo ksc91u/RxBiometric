@@ -15,94 +15,59 @@
  */
 package com.github.pwittchen.rxbiometric.library
 
-import android.content.DialogInterface
+import android.annotation.SuppressLint
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import androidx.biometric.BiometricPrompt
 import androidx.biometric.BiometricPrompt.AuthenticationCallback
 import androidx.biometric.BiometricPrompt.CryptoObject
+import androidx.core.app.ActivityCompat
 import androidx.fragment.app.FragmentActivity
-import io.reactivex.*
+import io.reactivex.Observable
+import io.reactivex.ObservableEmitter
 import java.util.concurrent.Executor
 
-class RxBiometric {
+class RxBiometric(val promptInfo: BiometricPrompt.PromptInfo) {
+
   companion object {
-    private lateinit var title: String
-    private lateinit var description: String
-    private lateinit var negativeButtonText: String
-    private lateinit var negativeButtonListener: DialogInterface.OnClickListener
-    private lateinit var executor: Executor
-    private lateinit var promptInfo: BiometricPrompt.PromptInfo
 
     @JvmStatic
-    fun create(
+    fun build(
       builder: RxBiometricBuilder
-    ): Companion {
-      this.title = builder.title
-      this.description = builder.description
-      this.negativeButtonText = builder.negativeButtonText
-      this.negativeButtonListener = builder.negativeButtonListener
-      this.executor = builder.executor
-      this.promptInfo = BiometricPrompt.PromptInfo.Builder()
-        .setTitle(title)
-        .setDescription(description)
-        .setNegativeButtonText(negativeButtonText).build()
-      return this
+    ): RxBiometric {
+      return RxBiometric(BiometricPrompt.PromptInfo.Builder()
+          .setTitle(builder.title)
+          .setDescription(builder.description)
+          .setNegativeButtonText(builder.negativeButtonText).build()
+      )
     }
+  }
 
-    @JvmStatic
-    fun builder(): RxBiometricBuilder {
-      return RxBiometricBuilder()
+  fun authenticate(activity: FragmentActivity): Observable<BiometricPrompt.AuthenticationResult> {
+    return Observable.create { emitter ->
+      createPrompt(activity, emitter).authenticate(promptInfo)
     }
+  }
 
-    @JvmStatic
-    fun title(title: String): RxBiometricBuilder {
-      return builder().title(title)
+  fun authenticate(
+    activity: FragmentActivity,
+    cryptoObject: CryptoObject
+  ): Observable<BiometricPrompt.AuthenticationResult> {
+    return Observable.create { emitter ->
+      createPrompt(activity, emitter).authenticate(
+        promptInfo,
+        cryptoObject
+      )
     }
+  }
 
-    @JvmStatic
-    fun description(description: String): RxBiometricBuilder {
-      return builder().description(description)
-    }
+  @SuppressLint("NewApi")
+  fun createPrompt(activity: FragmentActivity, emitter: ObservableEmitter<BiometricPrompt.AuthenticationResult>): BiometricPrompt {
+    return BiometricPrompt(activity, ActivityCompat.getMainExecutor(activity), createAuthenticationCallback(emitter))
+  }
 
-    @JvmStatic
-    fun negativeButtonText(text: String): RxBiometricBuilder {
-      return builder().negativeButtonText(text)
-    }
-
-    @JvmStatic
-    fun negativeButtonListener(listener: DialogInterface.OnClickListener): RxBiometricBuilder {
-      return builder().negativeButtonListener(listener)
-    }
-
-    @JvmStatic fun executor(executor: Executor): RxBiometricBuilder {
-      return builder().executor(executor)
-    }
-
-    @JvmStatic
-    fun authenticate(activity: FragmentActivity): Observable<BiometricPrompt.AuthenticationResult> {
-      return Observable.create { emitter ->
-        createPrompt(activity, emitter).authenticate(promptInfo)
-      }
-    }
-
-    @JvmStatic
-    fun authenticate(
-      activity: FragmentActivity,
-      cryptoObject: CryptoObject
-    ): Observable<BiometricPrompt.AuthenticationResult> {
-      return Observable.create { emitter ->
-        createPrompt(activity, emitter).authenticate(
-          promptInfo,
-          cryptoObject
-        )
-      }
-    }
-
-    fun createPrompt(activity: FragmentActivity, emitter: ObservableEmitter<BiometricPrompt.AuthenticationResult>): BiometricPrompt {
-      return BiometricPrompt(activity, executor, createAuthenticationCallback(emitter))
-    }
-
-    fun createAuthenticationCallback(emitter: ObservableEmitter<BiometricPrompt.AuthenticationResult>): AuthenticationCallback {
-      return Authentication().createAuthenticationCallback(emitter)
-    }
+  private fun createAuthenticationCallback(emitter: ObservableEmitter<BiometricPrompt.AuthenticationResult>): AuthenticationCallback {
+    return Authentication().createAuthenticationCallback(emitter)
   }
 }

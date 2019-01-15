@@ -14,6 +14,7 @@ import androidx.biometric.BiometricPrompt
 import androidx.core.app.ActivityCompat
 import androidx.fragment.app.FragmentActivity
 import com.github.pwittchen.rxbiometric.library.RxBiometric
+import com.github.pwittchen.rxbiometric.library.RxBiometricBuilder
 import com.github.pwittchen.rxbiometric.library.validation.RxPreconditions
 import io.reactivex.Observable
 import io.reactivex.android.schedulers.AndroidSchedulers
@@ -130,13 +131,12 @@ class SecureKey(private val keyName: String, private val context: Context) {
         init(Cipher.DECRYPT_MODE, secretKey, IvParameterSpec(encryptTextAndIv.second))
       }
     var cryptoObject = BiometricPrompt.CryptoObject(cipher)
-    return RxBiometric
+    return RxBiometricBuilder()
       .title("Decrypt")
       .description("Decrypt")
       .negativeButtonText("cancel")
       .negativeButtonListener(DialogInterface.OnClickListener { p0, p1 ->
       })
-      .executor(ActivityCompat.getMainExecutor(activity))
       .build()
       .authenticate(activity, cryptoObject)
       .observeOn(AndroidSchedulers.mainThread())
@@ -195,13 +195,12 @@ class SecureKey(private val keyName: String, private val context: Context) {
         init(Cipher.ENCRYPT_MODE, secretKey)
       }
     var cryptoObject = BiometricPrompt.CryptoObject(cipher)
-    return RxBiometric
+    return RxBiometricBuilder()
       .title("Encrypt")
       .description("Encrypt")
       .negativeButtonText("cancel")
       .negativeButtonListener(DialogInterface.OnClickListener { p0, p1 ->
       })
-      .executor(ActivityCompat.getMainExecutor(activity))
       .build()
       .authenticate(activity, cryptoObject)
       .observeOn(AndroidSchedulers.mainThread())

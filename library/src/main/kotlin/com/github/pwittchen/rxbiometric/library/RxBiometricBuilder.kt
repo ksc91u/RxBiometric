@@ -16,15 +16,12 @@
 package com.github.pwittchen.rxbiometric.library
 
 import android.content.DialogInterface
-import com.github.pwittchen.rxbiometric.library.RxBiometric.Companion
-import java.util.concurrent.Executor
 
 class RxBiometricBuilder {
   internal lateinit var title: String
   internal lateinit var description: String
   internal lateinit var negativeButtonText: String
   internal lateinit var negativeButtonListener: DialogInterface.OnClickListener
-  internal lateinit var executor: Executor
 
   fun title(title: String): RxBiometricBuilder {
     this.title = title
@@ -46,12 +43,7 @@ class RxBiometricBuilder {
     return this
   }
 
-  fun executor(executor: Executor): RxBiometricBuilder {
-    this.executor = executor
-    return this
-  }
-
-  fun build(): Companion {
-    return RxBiometric.create(this)
+  fun build(): RxBiometric {
+    return RxBiometric.build(this)
   }
 }
