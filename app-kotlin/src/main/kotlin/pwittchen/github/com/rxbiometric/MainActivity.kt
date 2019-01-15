@@ -23,6 +23,7 @@ import android.util.Base64
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import io.reactivex.disposables.Disposable
+import io.reactivex.rxkotlin.subscribeBy
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.content_main.*
 import javax.crypto.BadPaddingException
@@ -71,24 +72,25 @@ class MainActivity : AppCompatActivity() {
     }
 
     encryptBtn.setOnClickListener {
-      secureKey?.encryptWithBiometrics(this, "Hello World".toByteArray())?.subscribe {
-        if (it == null) {
-          return@subscribe
-        }
-        this@MainActivity.lastIv = Base64.encodeToString(it.second, Base64.URL_SAFE)
-        this@MainActivity.encoded = Base64.encodeToString(it.first, Base64.URL_SAFE)
+      secureKey?.let{ key ->
+        key.encryptWithBiometrics(this, "Hello World".toByteArray()).subscribeBy(onSuccess = {
+          this@MainActivity.lastIv = Base64.encodeToString(it.second, Base64.URL_SAFE)
+          this@MainActivity.encoded = Base64.encodeToString(it.first, Base64.URL_SAFE)
+        }, onError = {
+          it.printStackTrace()
+        })
+
       }
     }
 
     decryptBtn.setOnClickListener {
       val iv = Base64.decode(this.lastIv, Base64.URL_SAFE)
       val encBytes = Base64.decode(this.encoded, Base64.URL_SAFE)
-      secureKey?.decryptWithBiometrics(this, Pair(encBytes, iv))?.subscribe {
-        if (it == null) {
-          return@subscribe
-        }
+      secureKey?.decryptWithBiometrics(this, Pair(encBytes, iv))?.subscribeBy( onSuccess= {
         println(">>>> decrypted " + String(it))
-      }
+      }, onError = {
+        it.printStackTrace()
+      })
     }
   }
 

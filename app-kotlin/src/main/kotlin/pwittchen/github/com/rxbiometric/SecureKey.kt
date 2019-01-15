@@ -11,12 +11,10 @@ import android.util.Base64
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.biometric.BiometricPrompt
-import androidx.core.app.ActivityCompat
 import androidx.fragment.app.FragmentActivity
-import com.github.pwittchen.rxbiometric.library.RxBiometric
 import com.github.pwittchen.rxbiometric.library.RxBiometricBuilder
 import com.github.pwittchen.rxbiometric.library.validation.RxPreconditions
-import io.reactivex.Observable
+import io.reactivex.Single
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.CompositeDisposable
 import io.reactivex.rxkotlin.addTo
@@ -118,10 +116,10 @@ class SecureKey(private val keyName: String, private val context: Context) {
   }
 
   @RequiresApi(Build.VERSION_CODES.M)
-  fun decryptWithBiometrics(activity: FragmentActivity, encryptTextAndIv: Pair<ByteArray, ByteArray>): Observable<ByteArray?> {
+  fun decryptWithBiometrics(activity: FragmentActivity, encryptTextAndIv: Pair<ByteArray, ByteArray>): Single<ByteArray> {
     if (secretKey == null) {
       Toast.makeText(activity, "Run initBiometrics first", Toast.LENGTH_LONG).show()
-      return Observable.error(IllegalStateException("Run initBiometrics first"))
+      return Single.error(IllegalStateException("Run initBiometrics first"))
     }
     val cipher = Cipher.getInstance(
       KeyProperties.KEY_ALGORITHM_AES + "/"
@@ -142,7 +140,7 @@ class SecureKey(private val keyName: String, private val context: Context) {
       .observeOn(AndroidSchedulers.mainThread())
       .map { authResult ->
         if (authResult.cryptoObject == null) {
-          return@map null
+          throw java.lang.IllegalStateException("cryptoObject null")
         } else {
           val cipherFromResult = authResult.cryptoObject!!.cipher!!
           val result = cipherFromResult.doFinal(encryptTextAndIv.first)
@@ -182,10 +180,10 @@ class SecureKey(private val keyName: String, private val context: Context) {
   }
 
   @RequiresApi(Build.VERSION_CODES.M)
-  fun encryptWithBiometrics(activity: FragmentActivity, clearTextBytes: ByteArray): Observable<Pair<ByteArray, ByteArray>?> {
+  fun encryptWithBiometrics(activity: FragmentActivity, clearTextBytes: ByteArray): Single<Pair<ByteArray, ByteArray>> {
     if (secretKey == null) {
       Toast.makeText(activity, "Run initBiometrics first", Toast.LENGTH_LONG).show()
-      return Observable.error(IllegalStateException("Run initBiometrics first"))
+      return Single.error(IllegalStateException("Run initBiometrics first"))
     }
     val cipher = Cipher.getInstance(
       KeyProperties.KEY_ALGORITHM_AES + "/"
@@ -206,7 +204,7 @@ class SecureKey(private val keyName: String, private val context: Context) {
       .observeOn(AndroidSchedulers.mainThread())
       .map { authResult ->
         if (authResult.cryptoObject == null) {
-          return@map null
+          throw java.lang.IllegalStateException("cryptoObject null")
         } else {
           val cipher = authResult.cryptoObject!!.cipher!!
           val result = cipher.doFinal(clearTextBytes)

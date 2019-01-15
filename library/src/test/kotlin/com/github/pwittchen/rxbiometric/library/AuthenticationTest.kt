@@ -20,7 +20,7 @@ import androidx.biometric.BiometricPrompt.AuthenticationCallback
 import androidx.biometric.BiometricPrompt.AuthenticationResult
 import com.github.pwittchen.rxbiometric.library.throwable.AuthenticationError
 import com.github.pwittchen.rxbiometric.library.throwable.AuthenticationFail
-import io.reactivex.ObservableEmitter
+import io.reactivex.SingleEmitter
 import org.junit.Before
 import org.junit.Test
 import org.mockito.ArgumentMatchers.any
@@ -29,13 +29,14 @@ import org.mockito.Mockito.spy
 import org.mockito.Mockito.verify
 
 class AuthenticationTest {
-  private lateinit var emitter: ObservableEmitter<BiometricPrompt.AuthenticationResult>
+  private lateinit var emitter: SingleEmitter<BiometricPrompt.AuthenticationResult>
   private lateinit var authentication: Authentication
   private lateinit var callback: AuthenticationCallback
 
   @Before
   fun setUp() {
-    emitter = mock(ObservableEmitter::class.java) as ObservableEmitter<BiometricPrompt.AuthenticationResult>
+    @Suppress("UNCHECKED_CAST")
+    emitter = mock(SingleEmitter::class.java) as SingleEmitter<BiometricPrompt.AuthenticationResult>
     authentication = spy(Authentication())
     callback = authentication.createAuthenticationCallback(emitter)
   }
@@ -49,7 +50,7 @@ class AuthenticationTest {
     callback.onAuthenticationSucceeded(result)
 
     // then
-    verify(emitter).onNext(result)
+    verify(emitter).onSuccess(result)
   }
 
   @Test

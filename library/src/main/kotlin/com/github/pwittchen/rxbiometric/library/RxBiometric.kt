@@ -21,8 +21,8 @@ import androidx.biometric.BiometricPrompt.AuthenticationCallback
 import androidx.biometric.BiometricPrompt.CryptoObject
 import androidx.core.app.ActivityCompat
 import androidx.fragment.app.FragmentActivity
-import io.reactivex.Observable
-import io.reactivex.ObservableEmitter
+import io.reactivex.Single
+import io.reactivex.SingleEmitter
 
 class RxBiometric(val promptInfo: BiometricPrompt.PromptInfo) {
 
@@ -40,8 +40,8 @@ class RxBiometric(val promptInfo: BiometricPrompt.PromptInfo) {
     }
   }
 
-  fun authenticate(activity: FragmentActivity): Observable<BiometricPrompt.AuthenticationResult> {
-    return Observable.create { emitter ->
+  fun authenticate(activity: FragmentActivity): Single<BiometricPrompt.AuthenticationResult> {
+    return Single.create { emitter ->
       createPrompt(activity, emitter).authenticate(promptInfo)
     }
   }
@@ -49,8 +49,8 @@ class RxBiometric(val promptInfo: BiometricPrompt.PromptInfo) {
   fun authenticate(
     activity: FragmentActivity,
     cryptoObject: CryptoObject
-  ): Observable<BiometricPrompt.AuthenticationResult> {
-    return Observable.create { emitter ->
+  ): Single<BiometricPrompt.AuthenticationResult> {
+    return Single.create { emitter ->
       createPrompt(activity, emitter).authenticate(
         promptInfo,
         cryptoObject
@@ -59,11 +59,19 @@ class RxBiometric(val promptInfo: BiometricPrompt.PromptInfo) {
   }
 
   @SuppressLint("NewApi")
-  fun createPrompt(activity: FragmentActivity, emitter: ObservableEmitter<BiometricPrompt.AuthenticationResult>): BiometricPrompt {
-    return BiometricPrompt(activity, ActivityCompat.getMainExecutor(activity), createAuthenticationCallback(emitter))
+  fun createPrompt(
+    activity: FragmentActivity,
+    emitter: SingleEmitter<BiometricPrompt.AuthenticationResult>
+  ): BiometricPrompt {
+    return BiometricPrompt(activity,
+      ActivityCompat.getMainExecutor(activity),
+      createAuthenticationCallback(emitter)
+    )
   }
 
-  private fun createAuthenticationCallback(emitter: ObservableEmitter<BiometricPrompt.AuthenticationResult>): AuthenticationCallback {
+  private fun createAuthenticationCallback(
+    emitter: SingleEmitter<BiometricPrompt.AuthenticationResult>
+  ): AuthenticationCallback {
     return Authentication().createAuthenticationCallback(emitter)
   }
 }
