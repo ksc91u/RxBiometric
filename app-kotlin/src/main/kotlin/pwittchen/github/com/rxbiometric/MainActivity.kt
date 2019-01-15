@@ -34,6 +34,7 @@ import io.reactivex.rxkotlin.subscribeBy
 import io.reactivex.schedulers.Schedulers
 import kotlinx.android.synthetic.main.activity_main.toolbar
 import kotlinx.android.synthetic.main.content_main.button
+import java.util.*
 
 class MainActivity : AppCompatActivity() {
 
@@ -54,8 +55,8 @@ class MainActivity : AppCompatActivity() {
             if (!it) Completable.error(BiometricNotSupported())
             else
               RxBiometric
-                .title("title")
-                .description("description")
+                .title("title " + (Random().nextInt() %100))
+                .description("description " + Random().nextInt())
                 .negativeButtonText("cancel")
                 .negativeButtonListener(DialogInterface.OnClickListener { _, _ ->
                   showMessage("cancel")
