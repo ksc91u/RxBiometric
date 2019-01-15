@@ -16,9 +16,6 @@
 package com.github.pwittchen.rxbiometric.library
 
 import android.annotation.SuppressLint
-import android.os.Build
-import android.os.Handler
-import android.os.Looper
 import androidx.biometric.BiometricPrompt
 import androidx.biometric.BiometricPrompt.AuthenticationCallback
 import androidx.biometric.BiometricPrompt.CryptoObject
@@ -26,7 +23,6 @@ import androidx.core.app.ActivityCompat
 import androidx.fragment.app.FragmentActivity
 import io.reactivex.Observable
 import io.reactivex.ObservableEmitter
-import java.util.concurrent.Executor
 
 class RxBiometric(val promptInfo: BiometricPrompt.PromptInfo) {
 
@@ -37,9 +33,9 @@ class RxBiometric(val promptInfo: BiometricPrompt.PromptInfo) {
       builder: RxBiometricBuilder
     ): RxBiometric {
       return RxBiometric(BiometricPrompt.PromptInfo.Builder()
-          .setTitle(builder.title)
-          .setDescription(builder.description)
-          .setNegativeButtonText(builder.negativeButtonText).build()
+        .setTitle(builder.title)
+        .setDescription(builder.description)
+        .setNegativeButtonText(builder.negativeButtonText).build()
       )
     }
   }
