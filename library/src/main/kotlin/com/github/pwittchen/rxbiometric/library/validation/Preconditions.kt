@@ -30,7 +30,7 @@ class Preconditions {
     }
 
     @JvmStatic fun canHandleBiometric(context: Context): Boolean {
-      return hasBiometricSupport(context) && isAtLeastAndroidPie()
+      return hasBiometricSupport(context)
     }
   }
 }
