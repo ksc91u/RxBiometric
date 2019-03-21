@@ -139,8 +139,10 @@ dependencies {
 buildscript {
   repositories {
     mavenCentral()
-    jcenter()
     google()
+    maven{
+	  url 'http://repo.spring.io/plugins-release/'
+    }
     maven {
       url 'https://plugins.gradle.org/m2/'
     }
@@ -156,7 +158,9 @@ buildscript {
 
 repositories {
   mavenCentral()
-  jcenter()
+  maven{
+    url 'http://repo.spring.io/plugins-release/'
+  }
   google()
   maven {
     url 'https://plugins.gradle.org/m2/'
