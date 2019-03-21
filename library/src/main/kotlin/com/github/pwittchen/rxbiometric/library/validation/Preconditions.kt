@@ -17,6 +17,7 @@ package com.github.pwittchen.rxbiometric.library.validation
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.hardware.fingerprint.FingerprintManager
 import android.os.Build
 
 class Preconditions {
@@ -31,6 +32,14 @@ class Preconditions {
 
     @JvmStatic fun canHandleBiometric(context: Context): Boolean {
       return hasBiometricSupport(context)
+    }
+
+    @JvmStatic fun hasFingerprintEnrolled(context: Context) : Boolean{
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
+        val manager: FingerprintManager = context.getSystemService(Context.FINGERPRINT_SERVICE) as FingerprintManager
+        return manager.hasEnrolledFingerprints()
+      }
+      return false
     }
   }
 }
