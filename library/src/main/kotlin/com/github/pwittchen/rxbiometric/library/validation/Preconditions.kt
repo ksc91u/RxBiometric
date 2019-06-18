@@ -36,8 +36,8 @@ class Preconditions {
 
     @JvmStatic fun hasFingerprintEnrolled(context: Context) : Boolean{
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
-        val manager: FingerprintManager = context.getSystemService(Context.FINGERPRINT_SERVICE) as FingerprintManager
-        return manager.hasEnrolledFingerprints()
+        val manager: FingerprintManager? = context.getSystemService(Context.FINGERPRINT_SERVICE) as? FingerprintManager
+        return manager?.hasEnrolledFingerprints()?:false
       }
       return false
     }
